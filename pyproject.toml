@@ -1,10 +1,7 @@
 [tool.poetry]
 name = "mitiq"
 version = "0.18.0dev"
-description = '''
-Mitiq is an open source toolkit for implementing error mitigation techniques
-on most current intermediate-scale quantum computers.
-'''
+description = "Mitiq is an open source toolkit for implementing error mitigation techniqueson most current intermediate-scale quantum computers."
 authors = ["Unitary Fund <info@unitary.fund>"]
 license = "GPL v3.0"
 readme = "README.md"
