@@ -16,7 +16,7 @@ In this tutorial we describe how to use error mitigation capabilities from [Miti
 
 To get started, ensure you have the requisite python packages by running the following install commands.
 - `pip install mitiq`
-- `pip install 'bqskit[ext]'`
+- `pip install 'bqskit'`
 
 The main goal of this tutorial is to understand how to use `bqskit` together with `mitiq`.
 To do this, we will
@@ -33,7 +33,7 @@ To begin we import many of the required modules and functions.
 
 ```{code-cell} ipython3
 import bqskit
-from bqskit.ext import cirq_to_bqskit, bqskit_to_cirq
+from bqskit.ext.cirq.translate import cirq_to_bqskit, bqskit_to_cirq
 import mitiq
 
 import cirq
