@@ -15,6 +15,7 @@
 
 """Tests for the Clifford data regression top-level API."""
 from functools import partial
+import pytest
 
 import cirq
 import numpy as np
@@ -30,6 +31,7 @@ from mitiq.calibration import (
 from mitiq.calibration.calibrator import (
     convert_to_expval_executor,
     ExperimentResults,
+    MissingResultsError,
 )
 from mitiq.calibration.settings import (
     Strategy,
@@ -49,9 +51,14 @@ def execute(circuit, noise_level=0.001):
 
 
 settings = Settings(
-    circuit_types=["ghz", "rb"],
-    num_qubits=2,
-    circuit_depth=10,
+    [
+        {
+            "circuit_type": "ghz",
+            "num_qubits": 2,
+            "circuit_depth": 10,
+        },
+        {"circuit_type": "rb", "num_qubits": 2, "circuit_depth": 10},
+    ],
     strategies=[
         {
             "technique": "zne",
@@ -100,9 +107,15 @@ def test_get_cost():
 
 def test_best_strategy():
     test_strategy_settings = Settings(
-        circuit_types=["ghz", "mirror"],
-        num_qubits=2,
-        circuit_depth=10,
+        benchmarks=[
+            {"circuit_type": "ghz", "num_qubits": 2, "circuit_depth": 10},
+            {
+                "circuit_type": "mirror",
+                "num_qubits": 2,
+                "circuit_depth": 10,
+                "circuit_seed": 1,
+            },
+        ],
         strategies=[
             {
                 "technique": "zne",
@@ -125,7 +138,6 @@ def test_best_strategy():
                 "factory": LinearFactory([1.0, 3.0, 5.0]),
             },
         ],
-        circuit_seed=1,
     )
 
     cal = Calibrator(execute, test_strategy_settings)
@@ -148,7 +160,7 @@ def test_convert_to_expval_executor():
     assert np.isclose(rb_circuit_expval, 1.0)
 
 
-def test_execute_with_mitigation():
+def test_execute_with_mitigation(monkeypatch):
     cal = Calibrator(execute, ZNESettings)
 
     expval_executor = convert_to_expval_executor(
@@ -157,11 +169,19 @@ def test_execute_with_mitigation():
     rb_circuit = generate_rb_circuits(2, 10)[0]
     rb_circuit.append(cirq.measure(rb_circuit.all_qubits()))
 
+    # override the def of `input` so that it returns "yes"
+    monkeypatch.setattr("builtins.input", lambda _: "yes")
     expval = execute_with_mitigation(
         rb_circuit, expval_executor, calibrator=cal
     )
     assert isinstance(expval, float)
     assert 0 <= expval <= 1.5
+
+
+def test_double_run():
+    cal = Calibrator(execute, ZNESettings)
+    cal.run()
+    cal.run()
 
 
 def test_ExtrapolationResults_add_result():
@@ -195,3 +215,30 @@ def test_ExtrapolationResults_best_strategy():
     er.mitigated[4, 2] = 0.8
     er.ideal = np.ones((num_strategies, num_problems))
     assert er.best_strategy_id() == 4
+
+
+def test_logging(capfd):
+    cal = Calibrator(execute, ZNESettings)
+    cal.run(log=True)
+
+    captured = capfd.readouterr()
+    assert "circuit" in captured.out
+
+
+def test_ExperimentResults_reset_data():
+    num_strategies, num_problems = 5, 3
+    er = ExperimentResults(num_strategies, num_problems)
+    strat = Strategy(0, MitigationTechnique.ZNE, {})
+    problem = BenchmarkProblem(0, "circuit", "ghz", {})
+    er.add_result(
+        strat, problem, ideal_val=1.0, noisy_val=0.8, mitigated_val=0.9
+    )
+    assert not np.isnan(er.mitigated).all()
+    er.reset_data()
+    assert np.isnan(er.mitigated).all()
+
+
+def test_ExperimentResults_ensure_full():
+    er = ExperimentResults(5, 3)
+    with pytest.raises(MissingResultsError):
+        er.ensure_full()
