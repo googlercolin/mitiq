@@ -25,3 +25,4 @@ python:
     # Install Mitiq with "pip install .[development]"
     - method: pip
       path: .[development]
+  system_packages: true
